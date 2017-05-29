@@ -26,6 +26,8 @@ type tableEntry struct {
 	responseFunction (func(*discordgo.Session, *discordgo.MessageCreate))
 }
 
+var timeSeeded = false
+
 type Sound struct {
 	// name of the file the sound is stored in
 	Name string
@@ -39,8 +41,8 @@ type Sound struct {
 
 // type for a set of sounds
 type SoundSet struct {
-	SetName string
-	Sounds  []*Sound
+	SetNames []string
+	Sounds   []*Sound
 }
 
 // struct for a single instance of requesting a sound play
@@ -60,17 +62,31 @@ type PlayRequest struct {
 // sound set for trump "wrong" sounds
 var TRUMPWRONG *SoundSet = &SoundSet{
 
-	SetName: "!Wrong",
+	SetNames: []string{
+		"!wrong",
+	},
 
 	Sounds: []*Sound{
-		{"Classic", "DonaldTrumpWrongSound", 16, make([][]byte, 0)},
+		{"classic", "DonaldTrumpWrongSound", 16, make([][]byte, 0)},
 	},
 }
 
 var WOW *SoundSet = &SoundSet{
-	SetName: "!Wow",
+	SetNames: []string{
+		"!wow",
+	},
 	Sounds: []*Sound{
-		{"Classic", "Wow!", 16, make([][]byte, 0)},
+		{"classic", "Wow!", 16, make([][]byte, 0)},
+	},
+}
+
+var CONGRATULATIONS *SoundSet = &SoundSet{
+	SetNames: []string{
+		"!congratulations",
+	},
+	Sounds: []*Sound{
+		{"classic", "CongratulationsClassic", 16, make([][]byte, 0)},
+		{"tyrone", "CongratulationsTyrone", 16, make([][]byte, 0)},
 	},
 }
 
@@ -92,6 +108,7 @@ var responseTable []tableEntry = []tableEntry{
 var SoundSetCollection []*SoundSet = []*SoundSet{
 	TRUMPWRONG,
 	WOW,
+	CONGRATULATIONS,
 }
 
 // note: In go, syntax is:
@@ -169,6 +186,7 @@ func handleCommand(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if len(m.Content) <= 0 || (m.Content[0] != '!') {
 		return
 	}
+	message := strings.ToLower(m.Content)
 
 	// safety check - ignore messages from the bot itself
 	if m.Author.ID == s.State.User.ID {
@@ -178,14 +196,14 @@ func handleCommand(s *discordgo.Session, m *discordgo.MessageCreate) {
 		for i := 0; i < len(responseTable); i++ {
 
 			// if a matching command is found
-			if responseTable[i].messageTrigger == m.Content {
+			if responseTable[i].messageTrigger == message {
 				responseTable[i].responseFunction(s, m)
 				return
 			}
 		}
 		// no match found among response table. Check sound collection:
 
-		stringParts := strings.Split(m.Content, " ")
+		stringParts := strings.Split(message, " ")
 
 		// 1. Check to see if the entire string matches any of the sound collections
 		// also get guild and channel
@@ -202,25 +220,29 @@ func handleCommand(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 
 		for i := 0; i < len(SoundSetCollection); i++ {
-			if stringParts[0] == SoundSetCollection[i].SetName {
-				if len(stringParts) > 1 { // handle case: they specified a specific sound
+			for j := 0; j < len(SoundSetCollection[i].SetNames); j++ {
 
-					var sound *Sound
+				if strings.Contains(stringParts[0], SoundSetCollection[i].SetNames[j]) {
+					if len(stringParts) > 1 { // handle case: they specified a specific sound
 
-					for _, s := range SoundSetCollection[i].Sounds {
-						if stringParts[1] == s.Name {
-							sound = s
+						var sound *Sound
+
+						for _, s := range SoundSetCollection[i].Sounds {
+							if stringParts[1] == s.Name {
+								sound = s
+							}
 						}
-					}
-					// if it didn't match any, return
-					if sound == nil {
+						// if it didn't match any, return
+						if sound == nil {
+							return
+						}
+						queSoundPlay(m.Author, guild, SoundSetCollection[i], sound)
 						return
 					}
-					queSoundPlay(m.Author, guild, SoundSetCollection[i], sound)
+					// Play random sound from collection
+					queSoundPlay(m.Author, guild, SoundSetCollection[i], nil)
+					return
 				}
-				// Play random sound from collection
-				queSoundPlay(m.Author, guild, SoundSetCollection[i], nil)
-				return
 			}
 		}
 	}
@@ -332,7 +354,7 @@ func createPlayRequest(user *discordgo.User, guild *discordgo.Guild, sound *Soun
 		if (len(soundSet.Sounds) - 1) == 0 {
 			playRequest.sound = soundSet.Sounds[0]
 		} else {
-			playRequest.sound = soundSet.Sounds[randomRange(0, len(soundSet.Sounds)-1)]
+			playRequest.sound = soundSet.Sounds[randomRange(0, len(soundSet.Sounds))]
 		}
 	}
 
@@ -422,6 +444,9 @@ func getCurrentVoiceChannel(user *discordgo.User, guild *discordgo.Guild) *disco
 // this function blatantly stolen from airhornbot source code
 // Returns a random integer between min and max
 func randomRange(min, max int) int {
-	rand.Seed(time.Now().UTC().UnixNano())
+	if timeSeeded == false {
+		timeSeeded = true
+		rand.Seed(time.Now().UTC().UnixNano())
+	}
 	return rand.Intn(max-min) + min
 }
