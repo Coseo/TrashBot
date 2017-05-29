@@ -63,7 +63,14 @@ var TRUMPWRONG *SoundSet = &SoundSet{
 	SetName: "!Wrong",
 
 	Sounds: []*Sound{
-		{"Classic", "DonaldTrumpWrongSound", 32, make([][]byte, 0)},
+		{"Classic", "DonaldTrumpWrongSound", 16, make([][]byte, 0)},
+	},
+}
+
+var WOW *SoundSet = &SoundSet{
+	SetName: "!Wow",
+	Sounds: []*Sound{
+		{"Classic", "Wow!", 16, make([][]byte, 0)},
 	},
 }
 
@@ -84,6 +91,7 @@ var responseTable []tableEntry = []tableEntry{
 
 var SoundSetCollection []*SoundSet = []*SoundSet{
 	TRUMPWRONG,
+	WOW,
 }
 
 // note: In go, syntax is:
@@ -112,7 +120,9 @@ func main() {
 
 	// load sound sets
 	fmt.Println("Preloading sounds...")
-	TRUMPWRONG.loadSet()
+	for i := 0; i < len(SoundSetCollection); i++ {
+		SoundSetCollection[i].loadSet()
+	}
 
 	// Create new discord session with provided bot token
 	dg, err := discordgo.New("Bot " + Token)
